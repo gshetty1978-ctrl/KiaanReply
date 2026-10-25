@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: kiaanreply
+    runtime: static
+    buildCommand: "echo 'no build step'"
+    staticPublishPath: .
