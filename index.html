@@ -47,7 +47,14 @@
   .msg{padding:9px 13px;border-radius:14px;font-size:0.94rem;line-height:1.4;white-space:pre-wrap;word-break:break-word}
   .msg-row.me .msg{background:var(--accent);border-bottom-right-radius:4px}
   .msg-row.them .msg{background:var(--panel2);border-bottom-left-radius:4px}
-  .msg-time{font-size:0.72rem;color:var(--muted);margin-top:3px;padding:0 4px}
+  .msg-foot{display:flex;align-items:center;gap:8px;margin-top:3px;padding:0 4px}
+  .msg-time{font-size:0.72rem;color:var(--muted)}
+  .msg-time.edited::after{content:" · edited"}
+  .msg-actions{display:none;gap:6px}
+  .msg-row.me:hover .msg-actions{display:flex}
+  .msg-actions button{background:none;border:none;color:var(--muted);font-size:0.72rem;padding:0;cursor:pointer;font-weight:400}
+  .msg-actions button:hover{color:var(--text);background:none;text-decoration:underline}
+  .msg-edit-input{width:100%;padding:7px 11px;border-radius:12px;border:1px solid var(--accent2);background:var(--panel);color:var(--text);font-size:0.94rem}
   #noSelect{flex:1;display:flex;align-items:center;justify-content:center;color:var(--muted)}
   #replyBox{display:none;gap:8px;padding:12px;border-top:1px solid var(--line);padding-bottom:max(12px, env(safe-area-inset-bottom, 0px))}
   #replyBox input{flex:1}
@@ -203,11 +210,55 @@
         var bubble = document.createElement('div');
         bubble.className = 'msg';
         bubble.textContent = msg.text;
-        var time = document.createElement('div');
-        time.className = 'msg-time';
+        var foot = document.createElement('div');
+        foot.className = 'msg-foot';
+        var time = document.createElement('span');
+        time.className = 'msg-time' + (msg.editedAt ? ' edited' : '');
         time.textContent = formatTime(msg.at);
+        foot.appendChild(time);
+
+        if (msg.from === 'owner'){
+          var actions = document.createElement('span');
+          actions.className = 'msg-actions';
+          var editBtn = document.createElement('button');
+          editBtn.type = 'button';
+          editBtn.textContent = 'Edit';
+          editBtn.addEventListener('click', function(){
+            var input = document.createElement('input');
+            input.className = 'msg-edit-input';
+            input.type = 'text';
+            input.maxLength = 2000;
+            input.value = msg.text;
+            bubble.replaceWith(input);
+            input.focus();
+            input.setSelectionRange(input.value.length, input.value.length);
+            function finish(save){
+              var newText = input.value.trim();
+              input.replaceWith(bubble);
+              if (save && newText && newText !== msg.text){
+                socket.emit('owner:editMessage', { conversationId: convo.id, messageId: msg.id, text: newText });
+              }
+            }
+            input.addEventListener('keydown', function(e){
+              if (e.key === 'Enter'){ e.preventDefault(); finish(true); }
+              else if (e.key === 'Escape'){ finish(false); }
+            });
+            input.addEventListener('blur', function(){ finish(true); });
+          });
+          var delBtn = document.createElement('button');
+          delBtn.type = 'button';
+          delBtn.textContent = 'Delete';
+          delBtn.addEventListener('click', function(){
+            if (!confirm('Delete this message?')) return;
+            socket.emit('owner:deleteMessage', { conversationId: convo.id, messageId: msg.id });
+          });
+          actions.appendChild(editBtn);
+          actions.appendChild(delBtn);
+          foot.appendChild(actions);
+        }
+
         row.appendChild(bubble);
-        row.appendChild(time);
+        row.appendChild(foot);
         msgsEl.appendChild(row);
       });
       msgsEl.scrollTop = msgsEl.scrollHeight;
